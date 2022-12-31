@@ -5,18 +5,22 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import pyautogui as pg
 import pyperclip as pc
+import time
 
 import sys
+
 print('\n'.join(sys.path))
 
 #start
 def draw():
     quick = checkStartVar.get()
-    scale = 11 - int(accVar.get())
+    useContour = checkContoursVar.get()
+    accuracy = int(accVar.get())
+    brightness = int(brightnessVar.get())
 
     if quick:
+
         time.sleep(3)
-        
         startx, starty = pg.position()
 
         startxVar.set(str(startx))
@@ -32,34 +36,73 @@ def draw():
         endx = int(endxEntry.get())
         endy = int(endyEntry.get())
 
-    src = cv.imread("./pic.png")
+    src = cv.imread("./assets/image.png")
 
-    gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)
-    gaussian = cv.GaussianBlur(gray, (3, 3), 0)
+    if useContour: #輪廓模式
+        pg.PAUSE = 0.00001
+        accuracy = 11 - accuracy
 
-    edges = cv.Canny(gaussian, 70, 210)
-    contours, hierarchy = cv.findContours(
-        edges, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
+        gray = cv.cvtColor(src, cv.COLOR_BGR2GRAY)
+        gaussian = cv.GaussianBlur(gray, (3, 3), 0)
 
-    pg.PAUSE = 0.00001
-    
-    for i in range(0, len(contours)):
-        if startx + contours[i][0][0][0] < endx and starty + contours[i][0][0][1] < endy:
-            pg.moveTo(startx + contours[i][0][0][0], starty + contours[i][0][0][1])
-            pg.mouseDown()
+        edges = cv.Canny(gaussian, 70, 210)
+        contours, hierarchy = cv.findContours(
+            edges, cv.RETR_TREE, cv.CHAIN_APPROX_SIMPLE)
 
-        else:
-            continue
-         
-        for j in range(len(contours[i]) - 1, -1, -1 * scale):
-            if startx + contours[i][j][0][0] < endx and starty + contours[i][j][0][1] < endy:
-                 pg.moveTo(startx + contours[i][j][0][0], starty + contours[i][j][0][1], duration = 0.05)
+        for i in range(0, len(contours)):
+            if startx + contours[i][0][0][0] < endx and starty + contours[i][0][0][1] < endy:
+                pg.moveTo(startx + contours[i][0][0][0], starty + contours[i][0][0][1])
+                pg.mouseDown()
 
             else:
-                 pg.mouseUp()
-                 break
-        
-        pg.mouseUp()        
+                continue
+            
+            for j in range(len(contours[i]) - 1, -1, -1 * accuracy):
+                if startx + contours[i][j][0][0] < endx and starty + contours[i][j][0][1] < endy:
+                    pg.moveTo(startx + contours[i][j][0][0], starty + contours[i][j][0][1], duration = 0.05)
+
+                else:
+                    pg.mouseUp()
+                    break
+            
+            pg.mouseUp()
+    
+    else: #像素模式
+        pg.PAUSE = 0
+        height, width, _ = src.shape
+        mouseToggled = 0
+
+        for i in range(height):
+            if starty +  i > endy:
+                break
+            
+            for j in range(0, width):
+                if startx + j > endx:
+                    if mouseToggled >= 1:
+                        pg.moveTo(startx + j - 1, starty + i)
+                        
+                    break
+
+                if src[i, j].sum() < brightness:
+                    mouseToggled += 1
+
+                else:
+                    if mouseToggled != 0:
+                        mouseToggled = -1
+
+                if mouseToggled == 1:
+                    pg.moveTo(startx + j, starty + i)
+                    temp_x = j
+                    pg.mouseDown()
+
+                elif mouseToggled == -1:
+                    pg.moveTo(startx + j - 1, starty + i)
+                    pg.mouseUp()
+
+                    mouseToggled = 0
+
+            pg.mouseUp()
+            mouseToggled = 0
        
     hint.config(text = "Done!")
 
@@ -70,19 +113,19 @@ def fileMode():
     global hintON
 
     if hintON:
-        win.geometry('350x210')
+        win.geometry('350x285')
         btnHint.config(text = "↓") 
         hintON = False
 
     else:
-        win.geometry('350x240')
+        win.geometry('350x320')
         btnHint.config(text = "↑") 
         hintON = True
 
 #contours
 def contours():
     cv.destroyAllWindows()
-    src = cv.imread("./pic.png")
+    src = cv.imread("./assets/image.png")
 
     sp = src.shape
 
@@ -102,31 +145,33 @@ def contours():
     cv.drawContours(img, contours, -1, (50, 50, 50), 2)
     cv.imshow('Preview', img)
 
-    scale = 11 - int(accVar.get())
+    accuracy = 11 - int(accVar.get())
     
     count = 0
 
     for i in range(len(contours)):
         count += len(contours[i])
 
-    usedTimes = (count * 0.02) / scale
+    usedTimes = (count * 0.02) / accuracy
 
     hint.config(text = str(len(contours)) + " 個輪廓 預估用時 : " +str(int(usedTimes)) + " 秒")
 
 #color
 def show_rgb(event,x,y,flags,userdata):
     if event == 1:
-        src = cv.imread("./pic.png")
+        src = cv.imread("./assets/image.png")
         color = src[y, x]
 
         colorhex = "#" + str(hex(int(color[2])))[2:4] + str(hex(int(color[1])))[2:4] + str(hex(int(color[0])))[2:4]
         pc.copy(colorhex)
         
         hint.config(text = "R " + str(int(color[2])) + "  G " + str(int(color[1])) + " B " + str(int(color[0])))
+
+        brightnessVar.set(color.sum())
     
 def color():
     cv.destroyAllWindows()
-    src = cv.imread("./pic.png")
+    src = cv.imread("./assets/image.png")
     cv.imshow('image', src)
 
     cv.setMouseCallback('image', show_rgb)
@@ -143,12 +188,24 @@ def show_xy(event,x,y,flags,userdata):
         endyVar.set(str(y))
     
 def setting():
-    pg.screenshot('./screenshot.png')
+    pg.screenshot('./assets/screenshot.png')
     
-    img = cv.imread('./screenshot.png')
+    img = cv.imread('./assets/screenshot.png')
     cv.imshow('img', img)
 
     cv.setMouseCallback('img', show_xy)
+
+def Scale():
+    cv.destroyAllWindows()
+    scale = int(scaleVar.get()) / 100
+
+    img = cv.imread('./assets/raw_image.png')
+    height, width, _ = img.shape
+    img = cv.resize(img, (int(width * scale), int(height * scale)))
+    cv.imwrite('./assets/image.png', img)
+    cv.imshow('image', img)
+
+    hint.config(text = "調整成功! (圖片大小 " + str(int(width * scale)) + "*" + str(int(height * scale)) + ")")
 
 #pillow 
 from PIL import Image, ImageGrab
@@ -156,9 +213,10 @@ from PIL import Image, ImageGrab
 def clipBoard(): #load from ClipBoard
     im = ImageGrab.grabclipboard()
     if isinstance(im, Image.Image):
-        im.save('./pic.png')
+        im.save('./assets/raw_image.png')
+        im.save('./assets/image.png')
 
-        img = cv.imread('pic.png')
+        img = cv.imread('./assets/raw_image.png')
         height, width, _ = img.shape
 
         hint.config(text = "載入成功! (圖片大小 " + str(width) + "*" + str(height) + ")")
@@ -168,7 +226,7 @@ def clipBoard(): #load from ClipBoard
 
 #win
 win = tk.Tk() 
-win.geometry('350x210')
+win.geometry('350x285')
 win.title("AutoDrawingBot")
 win.iconbitmap('.\icons\drawingbot.ico')
 win.config(bg="#eeeeee", padx = 5, pady = 5)
@@ -240,6 +298,28 @@ acc = tk.Label(frame1, bg="#eeeeee", font = "System 12", text = "精準度")
 acc.config(width = 15) 
 acc.grid(row = 0, column = 0)
 
+#brightness
+brightnessVar = tk.StringVar()
+brightnessSpinbox = tk.Spinbox(frame1, from_=0, to=765, textvariable=brightnessVar, wrap = True)
+brightnessSpinbox.config(width = 10)
+brightnessSpinbox.grid(row = 1, column = 1)
+brightnessVar.set("450")
+
+brightness = tk.Label(frame1, bg="#eeeeee", font = "System 12", text = "亮度值")
+brightness.config(width = 15) 
+brightness.grid(row = 1, column = 0)
+
+#scale
+scaleVar = tk.StringVar()
+scaleSpinbox = tk.Spinbox(frame1, from_=1, to=300, textvariable=scaleVar, wrap = True)
+scaleSpinbox.config(width = 10)
+scaleSpinbox.grid(row = 2, column = 1)
+scaleVar.set("100")
+
+scale = tk.Label(frame1, bg="#eeeeee", font = "System 12", text = "縮放 (%)")
+scale.config(width = 15) 
+scale.grid(row = 2, column = 0)
+
 #buttons
 btnLoad = ttk.Button(frame2, text = "剪貼簿", command = clipBoard)
 btnLoad.grid(row = 0, column = 0)
@@ -252,11 +332,18 @@ btnStart = ttk.Button(frame2, text = "顯示圖片", command = color)
 btnStart.grid(row = 1, column = 0)
 btnContours = ttk.Button(frame2, text = "預覽", command = contours)
 btnContours.grid(row = 1, column = 1)
+btnContours = ttk.Button(frame2, text = "調整大小", command = Scale)
+btnContours.grid(row = 1, column = 2)
 
 #checkBtn
 checkStartVar = tk.BooleanVar()
 checkStart = ttk.Checkbutton(frame2, text='快速開始', var = checkStartVar)
-checkStart.grid(row = 1, column = 2)
+checkStart.grid(row = 2, column = 0)
+
+checkContoursVar = tk.BooleanVar()
+checkContours = ttk.Checkbutton(frame2, text='使用輪廓', var = checkContoursVar)
+checkContours.grid(row = 2, column = 1)
+checkContoursVar.set(True)
 
 #XxAlanXDxX
 XxAlanXDxX = tk.Label(frame3, bg="#eeeeee",fg = "#cccccc",  font = "System 10", text = "新北市南山高中 普一和 22 吳晉綸 製作")
