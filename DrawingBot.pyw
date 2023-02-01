@@ -8,7 +8,6 @@ import pyperclip as pc
 import time
 
 import sys
-
 print('\n'.join(sys.path))
 
 #start
@@ -19,7 +18,6 @@ def draw():
     brightness = int(brightnessVar.get())
 
     if quick:
-
         time.sleep(3)
         startx, starty = pg.position()
 
