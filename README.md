@@ -50,13 +50,8 @@ To-Do List
 ---
 Here are some upcoming features and improvements:
 
-- [ ] Add more options and parameters for automatic drawing
-- [ ] Improve error handling for enhanced stability
-- [ ] Optimize program performance
-- [ ] Include more usage examples and sample images
 - [ ] Support loading images in additional formats
-- [ ] Display a progress bar for drawing
 - [ ] Enhance drawing algorithm for faster execution
-- [ ] Implement undo and redo functionality
+- [ ] Add export contours and import functionality
 
 If you have any suggestions or questions, please feel free to contact the author.

@@ -30,6 +30,7 @@ class AutoDrawerGUI:
     def intitialize_ui(self):
         self.master.geometry('625x265')
         self.master.title("AutoDrawingBot")
+        self.master.iconbitmap("icon.ico")
         self.master.config(bg="#eeeeee", padx = 5, pady = 5)
 
         #Left
@@ -236,7 +237,7 @@ class AutoDrawerGUI:
 
     def resizeImage(self):
         cv.destroyAllWindows()
-        scale = int(self.scale.get()) / 100
+        scale = float(self.scale.get()) / 100
         img = cv.imread('./images/raw_image.png')
         height, width, _ = img.shape
         img = cv.resize(img, (int(width * scale), int(height * scale)))
@@ -266,9 +267,20 @@ class m_image:
         self.simplified_edges = self.simplifyEdges(self.edges, scaling_factor)
 
         self.total_coords = sum([len(edge) for edge in self.simplified_edges])
+        self.caculateResizeScale()
 
         self.auto_drawer_GUI.updateLog("m_image: 完成!")
         self.configGUIBtn(True)
+
+    def caculateResizeScale(self):
+        img = cv.imread('./images/raw_image.png')
+        height, width, _ = img.shape
+        image_shape = np.array([width, height])
+
+        start_coord = np.array([int(self.auto_drawer_GUI.start_x.get()), int(self.auto_drawer_GUI.start_y.get())])
+        end_coord = np.array([int(self.auto_drawer_GUI.end_x.get()), int(self.auto_drawer_GUI.end_y.get())])
+        drawing_area = end_coord - start_coord
+        self.auto_drawer_GUI.scale.set(f"{(min(drawing_area / image_shape)*100):.2f}")
 
     def configGUIBtn(self, state: bool):
         state = [tk.DISABLED,tk.NORMAL][state]
