@@ -34,6 +34,19 @@ Usage Example:
 5. Click the "Start" button, and the program will automatically draw the contours of the image.
 6. You can use other buttons to display the image, resize the image, and perform other operations.
 
+setting.json Description:
+
+* `DEFAULT_SCALINE_FACTOR` (Default Simplification Factor): This value represents the degree of simplification of images, expressed as a percentage.
+* `MIN_EDGE_LENGTH` (Minimum Edge Length): This value represents the minimum length of edges to be retained during simplification.
+* `KERNEL_SIZE` (Kernel Size): This is the size of a convolution kernel, typically used for image processing operations. It is represented as an array, [width, height].
+* `LOW_cTHRESHOLD` (Low Canny Threshold): This is the low threshold used in Canny edge detection to determine edge strength.
+* `HIGH_cTHRESHOLD` (High Canny Threshold): This is the high threshold used in Canny edge detection to determine edge strength.
+* `DEFAULT_START_COORD` (Default Start Coordinates): These are the starting coordinates for drawing operations, represented as [x, y].
+* `DEFAULT_END_COORD` (Default End Coordinates): These are the ending coordinates for drawing operations, represented as [x, y].
+* `SETPOS_RECTANGLE_COLOR` (Set Position Rectangle Color): This is the color used to draw rectangles when marking coordinates adjustments, represented as an RGB color code.
+* `AUTO_FIT_AREA` (Auto Fit Area): A boolean value that determines whether the image is automatically resized to fit the drawing area.
+* `PG.PAUSE` (PyAutoGUI Pause): This is the pause time between operations in PyAutoGUI, measured in seconds.
+
 Version Updates
 ---
 * v1.0.0-beta (2022/12/15): Initial beta release.
