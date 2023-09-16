@@ -50,8 +50,8 @@ To-Do List
 ---
 Here are some upcoming features and improvements:
 
-- [ ] Support loading images in additional formats
 - [ ] Enhance drawing algorithm for faster execution
 - [ ] Add export contours and import functionality
+- [ ] Add embedding preview functionality
 
 If you have any suggestions or questions, please feel free to contact the author.
