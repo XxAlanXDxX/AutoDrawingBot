@@ -1,12 +1,11 @@
 {
     "DEFAULT_SCALINE_FACTOR" : 23,
     "MIN_EDGE_LENGTH" : 7,
-    "KERNEL_SIZE" : [5, 5],
-    "LOW_cTHRESHOLD" : 40,
-    "HIGH_cTHRESHOLD" : 220,
+    "KERNEL_SIZE" : [7, 7],
+    "LOW_cTHRESHOLD" : 20,
+    "HIGH_cTHRESHOLD" : 100,
     "DEFAULT_START_COORD": [70, 300],
     "DEFAULT_END_COORD": [1700, 870],
     "SETPOS_RECTANGLE_COLOR" : [0, 0, 255],
-    "AUTO_FIT_AREA" : true,
-    "PG.PAUSE" : 0
+    "AUTO_FIT_AREA" : true
 }
