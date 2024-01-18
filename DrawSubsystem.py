@@ -1,4 +1,3 @@
-import cv2 as cv
 import numpy as np
 import pyautogui as pg
 from PyQt5.QtCore import QObject, pyqtSignal, QThread
