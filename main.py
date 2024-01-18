@@ -1,282 +1,237 @@
-import numpy as np
-import cv2 as cv
-import tkinter as tk
-from tkinter import ttk, filedialog
-import pyautogui as pg
+import sys
+from PyQt5 import uic
+from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
+from PyQt5.QtGui import QPixmap, QImage, QIcon
 from PIL import Image, ImageGrab
+import cv2 as cv
+import numpy as np
+
+from DataManager import DataManager
+from DrawSubsystem import DrawSubsystem
 from ImageLoader import ImageLoader
+from CoordSelector import CoordSelector
 from Constants import *
 
-import json
+import time
 
-from libs.LogTextbox import LogTextbox
-with open('./setting.json', 'r', encoding="utf8") as jfile:
-  SETTING = json.load(jfile)
+Ui_MainWindow, QtBaseClass = uic.loadUiType("mainGUI.ui")
 
-pg.FAILSAFE = False
-pg.PAUSE = PGPAUSE
+class MyApp(QMainWindow, Ui_MainWindow):
+    def __init__(self):
+        super(MyApp, self).__init__()
+        self.setupUi(self)
 
-class AutoDrawerGUI:
-    def __init__(self, master):
-        self.master = master
-        self.intitialize_ui()
-        self.configFuntionBtn(False)
+        self.saved_image_edges = []
+        self.current_image_edges = None
+        self.setWindowIcon(QIcon('assets\icon.ico'))
 
-    def intitialize_ui(self):
-        self.master.geometry('670x265')
-        self.master.title("AutoDrawingBot")
-        self.master.iconbitmap("assets/icon.ico")
-        self.master.config(bg="#eeeeee", padx = 5, pady = 5)
+        self.loadData()
+        self.connectFunctionBtn()
 
-        self.createFrames()
-        self.createUserInput()
-        self.createFunctionButtons()
+    def loadData(self):
+        self.data_manager = DataManager()
 
-    def createFrames(self):
-        self.left_frame = tk.Frame(self.master)
-        self.left_frame.grid(row=0, column=0, padx=5, pady=5)
+        self.DEFAULT_SCALINE_FACTOR.setValue(self.data_manager.jsetting["DEFAULT_SCALINE_FACTOR"])
+        self.MIN_EDGE_LENGTH.setValue(self.data_manager.jsetting["MIN_EDGE_LENGTH"])
+        self.KERNEL_SIZEx.setValue(self.data_manager.jsetting["KERNEL_SIZE"][0])
+        self.KERNEL_SIZEy.setValue(self.data_manager.jsetting["KERNEL_SIZE"][1])
+        self.LOW_cTHRESHOLD.setValue(self.data_manager.jsetting["LOW_cTHRESHOLD"])
+        self.HIGH_cTHRESHOLD.setValue(self.data_manager.jsetting["HIGH_cTHRESHOLD"])
+        self.DEFAULT_START_COORDx.setValue(self.data_manager.jsetting["DEFAULT_START_COORD"][0])
+        self.DEFAULT_START_COORDy.setValue(self.data_manager.jsetting["DEFAULT_START_COORD"][1])
+        self.DEFAULT_END_COORDx.setValue(self.data_manager.jsetting["DEFAULT_END_COORD"][0])
+        self.DEFAULT_END_COORDy.setValue(self.data_manager.jsetting["DEFAULT_END_COORD"][1])
+        self.AUTO_FIT_AREA.setChecked(self.data_manager.jsetting["AUTO_FIT_AREA"])
+        self.PGPAUSE.setValue(self.data_manager.jsetting["PGPAUSE"])
+        self.USE_SPEEDMODE.setChecked(self.data_manager.jsetting["USE_SPEEDMODE"])
 
-        self.left_bottom_frame = tk.Frame(self.left_frame)
-        self.left_bottom_frame.grid(row=2, column=0, padx=5, pady=5)
+        self.SCALINE_FACTOR.setValue(self.data_manager.jsetting["DEFAULT_SCALINE_FACTOR"])
+        self.START_COORDx.setValue(self.data_manager.jsetting["DEFAULT_START_COORD"][0])
+        self.START_COORDy.setValue(self.data_manager.jsetting["DEFAULT_START_COORD"][1])
+        self.END_COORDx.setValue(self.data_manager.jsetting["DEFAULT_END_COORD"][0])
+        self.END_COORDy.setValue(self.data_manager.jsetting["DEFAULT_END_COORD"][1])
 
-        self.left_middle_frame = tk.Frame(self.left_frame)
-        self.left_middle_frame.grid(row=1, column=0, padx=5, pady=5)
+    def connectFunctionBtn(self):
+        self.apply_btn.clicked.connect(self.applySetting)
+        self.clipboard_btn.clicked.connect(self.loadfromClipboard)
+        self.openfile_btn.clicked.connect(self.openFile)
+        self.setcoord_btn.clicked.connect(self.setCoord)
+        self.start_btn.clicked.connect(self.startDrawing)
+        self.resizeEdges_btn.clicked.connect(self.resizeEdges)
+        self.reload_btn.clicked.connect(self.reloadImage)
 
-        self.left_top_frame = tk.Frame(self.left_frame)
-        self.left_top_frame.grid(row=0, column=0, padx=5, pady=5)
+        self.edges_select.itemClicked.connect(self.edgeSelected)
 
-    def createUserInput(self):
-        self.start_x = tk.StringVar()
-        Entry = tk.Entry(self.left_top_frame, bg="#ffffff", textvariable = self.start_x, font = "System 12", borderwidth = 1)
-        Entry.config(width = 5) 
-        Entry.insert(0, str(SETTING["DEFAULT_START_COORD"][0]))
-        Entry.grid(row = 0, column = 1, padx = 1)
+        self.reload_btn.setEnabled(False)
+        self.start_btn.setEnabled(False)
+        self.resizeEdges_btn.setEnabled(False)
 
-        self.start_y = tk.StringVar()
-        Entry = tk.Entry(self.left_top_frame, bg="#ffffff", textvariable = self.start_y, font = "System 12", borderwidth = 1)
-        Entry.config(width = 5) 
-        Entry.insert(0, str(SETTING["DEFAULT_START_COORD"][1]))
-        Entry.grid(row = 0, column = 2, padx = 1)
+    def toggleBtn(self, state):
+        self.start_btn.setEnabled(state)
+        self.apply_btn.setEnabled(state)
+        self.clipboard_btn.setEnabled(state)
+        self.setcoord_btn.setEnabled(state)
+        self.openfile_btn.setEnabled(state)
+        self.reload_btn.setEnabled(state)
+        self.resizeEdges_btn.setEnabled(state)
 
-        Label = tk.Label(self.left_top_frame, bg="#eeeeee", font = "System 12", text = "開始座標 [x, y]")
-        Label.config(width = 15) 
-        Label.grid(row = 0, column = 0)
+    def applySetting(self):
+        self.data_manager.saveSetting({
+            "DEFAULT_SCALINE_FACTOR": self.DEFAULT_SCALINE_FACTOR.value(),
+            "MIN_EDGE_LENGTH": self.MIN_EDGE_LENGTH.value(),
+            "KERNEL_SIZE": [self.KERNEL_SIZEx.value(), self.KERNEL_SIZEy.value()],
+            "LOW_cTHRESHOLD": self.LOW_cTHRESHOLD.value(),
+            "HIGH_cTHRESHOLD": self.HIGH_cTHRESHOLD.value(),
+            "DEFAULT_START_COORD": [self.DEFAULT_START_COORDx.value(), self.DEFAULT_START_COORDy.value()],
+            "DEFAULT_END_COORD": [self.DEFAULT_END_COORDx.value(), self.DEFAULT_END_COORDy.value()],
+            "AUTO_FIT_AREA": self.AUTO_FIT_AREA.isChecked(),
+            "PGPAUSE": self.PGPAUSE.value(),
+            "USE_SPEEDMODE": self.USE_SPEEDMODE.isChecked()
+        })
 
-        self.end_x = tk.StringVar()
-        Entry = tk.Entry(self.left_top_frame, bg="#ffffff", textvariable = self.end_x, font = "System 12", borderwidth = 1)
-        Entry.config(width = 5) 
-        Entry.insert(0, str(SETTING["DEFAULT_END_COORD"][0]))
-        Entry.grid(row = 1, column = 1, padx = 1)
+        self.statusbar.showMessage(f"儲存設定! ", 2000)
 
-        self.end_y = tk.StringVar()
-        Entry = tk.Entry(self.left_top_frame, bg="#ffffff", textvariable = self.end_y, font = "System 12", borderwidth = 1)
-        Entry.config(width = 5) 
-        Entry.insert(0, str(SETTING["DEFAULT_END_COORD"][1]))
-        Entry.grid(row = 1, column = 2, padx = 1)
+    def getsetting(self):
+        setting = {
+            "SCALINE_FACTOR": self.SCALINE_FACTOR.value(),
+            "MIN_EDGE_LENGTH": self.MIN_EDGE_LENGTH.value(),
+            "KERNEL_SIZE": [self.KERNEL_SIZEx.value(), self.KERNEL_SIZEy.value()],
+            "LOW_cTHRESHOLD": self.LOW_cTHRESHOLD.value(),
+            "HIGH_cTHRESHOLD": self.HIGH_cTHRESHOLD.value(),
+            "START_COORD": [self.START_COORDx.value(), self.START_COORDy.value()],
+            "END_COORD": [self.END_COORDx.value(), self.END_COORDy.value()],
+            "AUTO_FIT_AREA": self.AUTO_FIT_AREA.isChecked(),
+            "PGPAUSE": self.PGPAUSE.value(),
+            "USE_SPEEDMODE": self.USE_SPEEDMODE.isChecked()
+        }
 
-        Label = tk.Label(self.left_top_frame, bg="#eeeeee", font = "System 12", text = "邊界座標 [x, y]")
-        Label.config(width = 15) 
-        Label.grid(row = 1, column = 0)
+        return setting
 
-        self.scaling_factor = tk.StringVar()
-        Spinbox = tk.Spinbox(self.left_middle_frame, from_=1, to=20, textvariable=self.scaling_factor, wrap = True)
-        Spinbox.config(width = 10)
-        Spinbox.grid(row = 0, column = 1)
-        self.scaling_factor.set(str(SETTING["DEFAULT_SCALINE_FACTOR"]))
+    def setCoord(self):
+        coord_selector = CoordSelector(self)
+        coord_selector.progress_signal.progress.connect(self.setCoordCallback)
+        coord_selector.progress_signal.finished.connect(self.setCoordFinished)
+        coord_selector.start()
 
-        Label = tk.Label(self.left_middle_frame, bg="#eeeeee", font = "System 12", text = "簡化量 (%)")
-        Label.config(width = 15) 
-        Label.grid(row = 0, column = 0)
+    def setCoordCallback(self, coords):
+        self.START_COORDx.setValue(int(coords[0][1]))
+        self.START_COORDy.setValue(int(coords[0][0]))
+        self.END_COORDx.setValue(int(coords[1][1]))
+        self.END_COORDy.setValue(int(coords[1][0]))
 
-        self.scale = tk.StringVar()
-        Spinbox = tk.Spinbox(self.left_middle_frame, from_=1, to=300, textvariable=self.scale, wrap = True)
-        Spinbox.config(width = 10)
-        Spinbox.grid(row = 1, column = 1)
-        self.scale.set("100")
+    def setCoordFinished(self):
+        cv.destroyAllWindows()
 
-        Label = tk.Label(self.left_middle_frame, bg="#eeeeee", font = "System 12", text = "縮放量 (%)")
-        Label.config(width = 15) 
-        Label.grid(row = 1, column = 0)
-
-    def createFunctionButtons(self):
-        Button_width = 8
-        self.clipBoard_btn = ttk.Button(self.left_bottom_frame, text = "剪貼簿", width = Button_width, command = self.clipBoard)
-        self.clipBoard_btn.grid(row = 0, column = 0)
-
-        self.attachFile_btn = ttk.Button(self.left_bottom_frame, text = "開啟檔案", width = Button_width, command = self.attachFile)
-        self.attachFile_btn.grid(row = 0, column = 1)
-
-        self.reloadImage_btn = ttk.Button(self.left_bottom_frame, text = "重載圖片", width = Button_width, command = self.reloadImage)
-        self.reloadImage_btn.grid(row = 0, column = 2)
-
-
-        self.startDraw_btn = ttk.Button(self.left_bottom_frame, text = "開始", width = Button_width, command = self.startDraw)
-        self.startDraw_btn.grid(row = 0, column = 3)
-
-        self.resizeImage_btn = ttk.Button(self.left_bottom_frame, text = "調整大小", width = Button_width, command = self.resizeImage)
-        self.resizeImage_btn.grid(row = 1, column = 0)
-
-        self.setPositon_btn = ttk.Button(self.left_bottom_frame, text = "調整座標", width = Button_width, command = self.setPositon)
-        self.setPositon_btn.grid(row = 1, column = 1)
-
-        # self.openSetting_btn = ttk.Button(self.left_bottom_frame, text = "設定", width = Button_width, command = self.openSetting)
-        # self.openSetting_btn.grid(row = 1, column = 2)
-
-        self.showImage_btn = ttk.Button(self.left_bottom_frame, text = "顯示圖片", width = Button_width, command = self.showImage)
-        self.showImage_btn.grid(row = 1, column = 3)
-
-        #Right
-        self.right_frame = tk.Frame(self.master)
-        self.right_frame.grid(row=0, column=1, padx=10, pady=5)
-
-        self.hint = tk.Label(self.right_frame, width=28, bg="#dddddd", font="System 12", text="")
-        self.hint.grid(pady=5, columnspan=40)
-
-        self.log = LogTextbox(self.right_frame, width=35,  height=12, font=("System", 10))
-        self.log.grid(pady=5, columnspan=40)
-        self.log_count = 0
-
-    def updateLog(self, arg: str):
-        if self.log_count >= 10:
-            self.log.delete("1.0", "end")
-            self.log_count = 0
-
-        self.log.insert("end", f"{arg}\n")
-        self.log_count += 1
-
-    def updateHint(self, arg: str):
-        self.hint.config(text=arg)
-        self.master.update()
-
-    def loadImage(self):
-        self.image = ImageLoader("./images/image.png", self)
-
-    def attachFile(self):
-        file_path = filedialog.askopenfilename(title="Select file", filetypes= [("Image Files","*.png .jpg .jpeg")])
-
-        if file_path:
-            img = cv.imread(file_path)
-            cv.imwrite('./images/raw_image.png', img) 
-            cv.imwrite('./images/image.png', img) 
-            self.log.updateLog(f"attachFile: 開啟檔案 {file_path.split('/')[-1]}", LOG_DONE_COLOR)
-            self.loadImage()
-
-    def clipBoard(self):
+    def loadfromClipboard(self):
         im = ImageGrab.grabclipboard()
         if isinstance(im, Image.Image):
             im.save('./images/raw_image.png')
             im.save('./images/image.png')
 
-            self.loadImage()
+            self.loadImage("./images/raw_image.png")
 
         else:
-            self.log.updateLog(f"clipBoard: 錯誤! 未擷取到圖片", LOG_ERROR_COLOR)
+            self.statusbar.showMessage(f"未擷取到圖片! ", 2000)
+
+    def openFile(self):
+        path, _ = QFileDialog.getOpenFileName(self, "選擇圖片", "", "Image Files (*.png *.jpg *.bmp)")
+        self.loadImage(path) if path else None
 
     def reloadImage(self):
-        self.loadImage()
+        selected_item = self.edges_select.currentItem()
+        draw_image_edges = self.saved_image_edges[self.edges_select.row(selected_item)] if selected_item else self.current_image_edges
 
-    def setPositon(self):
-            pg.screenshot('./images/screenshot.png')
-            self.screenshot = cv.imread('./images/screenshot.png')
-            self.positons = []
-            cv.imshow('setPos', self.screenshot)
-            cv.setMouseCallback('setPos', self.activePos)
+        self.loadImage(draw_image_edges.path)
 
-    def activePos(self,event,x,y,flags,userdata):
-        if event == cv.EVENT_LBUTTONDOWN:
-            self.positons.append((x, y))
+    def loadImage(self, path):
+        self.start_time = time.time()
+        self.toggleBtn(False)
 
-            if len(self.positons) > 2:
-                self.screenshot = cv.imread('./images/screenshot.png')
-                self.positons.pop(0)
+        if self.data_manager.jsetting["USE_SPEEDMODE"]:
+            self.statusbar.showMessage(f"加載圖片中... (快速模式)")
+            self.progressing_data.setText("圖片處理: ")
 
-            if len(self.positons) == 2:
-                min_x = min(self.positons[0][0], self.positons[1][0])
-                min_y = min(self.positons[0][1], self.positons[1][1])
+        imageLoader = ImageLoader(
+            path=path, 
+            setting=self.getsetting(), 
+            parent=self
+        )
 
-                max_x = max(self.positons[0][0], self.positons[1][0])
-                max_y = max(self.positons[0][1], self.positons[1][1])
+        imageLoader.progress_signal.progress.connect(self.imageLoaderCallback)
+        imageLoader.progress_signal.finished.connect(self.imageLoaderFinished)
+        imageLoader.start()
 
-                self.start_x.set(str(min_x))
-                self.start_y.set(str(min_y))
-                self.end_x.set(str(max_x))
-                self.end_y.set(str(max_y))
+    def imageLoaderCallback(self, progress):
+        self.progressBar.setValue(int(progress))
+        self.statusbar.showMessage(f"加載圖片中...")
+        self.progressing_data.setText("圖片處理: ")
 
-                cv.rectangle(self.screenshot, self.positons[0], self.positons[1], SETTING["SETPOS_RECTANGLE_COLOR"], 2)
-                cv.imshow("setPos", self.screenshot)
+    def imageLoaderFinished(self, result):
+        self.toggleBtn(True)
+        self.statusbar.showMessage(f"完成! 用時 {time.time() - self.start_time:.2f} 秒", 2000)
+        self.progressing_data.setText("")
+        self.progressBar.setValue(0)
 
-    def drawContours(self, start_coord: tuple, end_coord: tuple):
-        edges = self.image.simplified_edges
-        print(self.image.total_coords)
+        self.current_image_edges = result
+        self.saved_image_edges.append(result)
+        self.edges_select.addItem(result.timestemp)
+        self.edges_select.setCurrentRow(self.edges_select.count() - 1)
 
-        finished_coords = 0
-        for edge in edges:
-            for edge_coord in edge:
-                self.updateHint(f"Drawing {(finished_coords / self.image.total_coords * 100):.2f} %")
-                if type(edge_coord) is np.ndarray:
-                    target_coord = (start_coord[0] + edge_coord[0], start_coord[1] + edge_coord[1])
-                    
-                if not (target_coord[0] > end_coord[0] or target_coord[1] > end_coord[1]):
-                    pg.moveTo(target_coord)
-                    pg.mouseDown()
-                    self.hint.config(fg="#000000")
-                    if np.linalg.norm(np.subtract(pg.position(), target_coord)) > 180:
-                        pg.mouseUp()
-                        return -1
-                else:
-                    self.hint.config(fg="#ff0000")
-                    
-                finished_coords += 1
+        self.setDisplayImage(result.path)
+        self.RESIZE_SCALE.setValue(result.scale * 100)
 
-            pg.mouseUp()
-            
-        self.hint.config(fg="#000000")
-        self.updateHint(f"Drawing 100.00 %")
-        return 0
+    def edgeSelected(self):
+        selected_item = self.edges_select.currentItem()
+        draw_image_edges = self.saved_image_edges[self.edges_select.row(selected_item)] if selected_item else self.current_image_edges
 
-    def startDraw(self):
-        start_coord = (int(self.start_x.get()), int(self.start_y.get()))
-        end_coord = (int(self.end_x.get()), int(self.end_y.get()))
-        self.exceptionCatcher(self.drawContours(start_coord, end_coord))
+        self.setDisplayImage(draw_image_edges.path)
 
-    def exceptionCatcher(self, exception_code):
-        if exception_code == 0:
-            self.log.updateLog("AutDrawingBot: 完成!", LOG_DONE_COLOR)
+    def setDisplayImage(self, image_path):
+        image = QImage(image_path)
+        original_width = image.width()
+        original_height = image.height()
+        scaled_width = self.image_display.width()
+        scaled_height = self.image_display.height()
+        scaled_image = image.scaledToWidth(scaled_width) if original_width > original_height else image.scaledToHeight(scaled_height)
+        pixmap = QPixmap(scaled_image)
+        self.image_display.setPixmap(pixmap)
+        
+    def startDrawing(self):
+        selected_item = self.edges_select.currentItem()
+        draw_image_edges = self.saved_image_edges[self.edges_select.row(selected_item)] if selected_item else self.current_image_edges
 
-        if exception_code == -1:
-            self.log.updateLog("AutDrawingBot: 游標移動: -1", LOG_ERROR_COLOR)
+        self.toggleBtn(False)
+        self.progressBar.setValue(0)
 
-    def showImage(self):
-        cv.destroyAllWindows()
-        cv.imshow('Image', self.image.image)
+        self.drawSubsystem = DrawSubsystem(
+            image_edges=draw_image_edges, 
+            setting=self.getsetting(), 
+            parent=self
+        )
 
-    def resizeImage(self):
-        scale = float(self.scale.get()) / 100
-        cv.destroyAllWindows()
-        raw_img = cv.imread('./images/raw_image.png')
-        height, width, _ = raw_img.shape
-        raw_img = cv.resize(raw_img, (int(width * scale), int(height * scale)))
-        cv.imwrite('./images/image.png', raw_img)
-        self.loadImage()
-        cv.imshow('resizedImage', raw_img)
+        self.drawSubsystem.progress_signal.progress.connect(self.drawSubsystemCallback)
+        self.drawSubsystem.progress_signal.finished.connect(self.drawSubsystemFinished)
+        self.drawSubsystem.start()
 
-        self.log.updateLog(f"resizeImage: 調整成功! ({str(int(width * scale))} * {str(int(height * scale))})", LOG_DONE_COLOR)
+    def drawSubsystemCallback(self, progress):
+        self.progressBar.setValue(int(progress[1]))
+        self.statusbar.showMessage(f"繪製中...")
+        self.progressing_data.setText("繪製: ")
 
-    def configFuntionBtn(self, state: bool):
-        state = [tk.DISABLED, tk.NORMAL][state]
-        self.showImage_btn.config(state=state)
-        self.startDraw_btn.config(state=state)
-        self.resizeImage_btn.config(state=state)
+    def drawSubsystemFinished(self, feedback):
+        self.toggleBtn(True)
+        self.progressBar.setValue(0)
+        self.statusbar.showMessage(f'{["完成!", "游標移動!"][feedback]}', 2000)
+        self.progressing_data.setText("")
 
-    def configLoadBtn(self, state: bool):
-        state = [tk.DISABLED, tk.NORMAL][state]
-        self.clipBoard_btn.config(state=state)
-        self.attachFile_btn.config(state=state)
-        self.reloadImage_btn.config(state=state)
+    def resizeEdges(self):
+        scale_value = self.RESIZE_SCALE.value() / 100
+        for i, edge in enumerate(self.current_image_edges.edges):
+            self.current_image_edges.edges[i] = np.array(edge) * np.array([scale_value, scale_value])
 
 
-  
 if __name__ == "__main__":
-    root = tk.Tk()
-    gui = AutoDrawerGUI(root)
-    root.mainloop()
+    app = QApplication(sys.argv)
+    window = MyApp()
+    window.show()
+    sys.exit(app.exec_())

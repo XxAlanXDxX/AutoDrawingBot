@@ -8,33 +8,23 @@ AutoDrawingBot
 > 
 > Language: English / [繁體中文](./README.zh-TW.md)
 
-Project Introduction
+Project Overview
 ---
-This project is an automatic drawing robot application called "AutoDrawingBot." It can automatically draw within a specified area based on the contour information of the loaded image.
+This is an automatic drawing program developed using PyQt5 and OpenCV. It allows users to load images, perform edge detection, and simulate the drawing process using mouse movements. The program provides a range of settings, allowing users to adjust various parameters for optimal drawing effects.
 
 Usage Instructions
 ---
 
-Getting Started:
-- Load an image
-- Set the starting coordinates and ending coordinates
-- Set the simplification factor and scaling factor
-- Clipboard: Copy an image from the clipboard into the program
-- Start drawing
-- Display the image
-- Resize the image
-- Reload the image: Reload the image from the file
+1. Run the Program: After executing the program, you will see the main window, which provides buttons for functions such as loading images, setting parameters, and starting drawing.
 
-Usage Example:
+2. Set Parameters: Click the "Settings" button to adjust various parameters, including scaling factor, edge detection parameters, etc.
 
-1. Launch the program.
-2. Click the "Clipboard" button to load an image from the clipboard.
-3. Set the starting coordinates and ending coordinates to specify the drawing area (click with the left mouse button).
-4. Set the simplification factor and scaling factor as needed.
-5. Click the "Start" button, and the program will automatically draw the contours of the image.
-6. You can use other buttons to display the image, resize the image, and perform other operations.
+3. Load Images: Use the "Load Image" button or load an image from the clipboard. The program will process the image and display it in the main window.
 
-setting.json Description:
+4. Start Drawing: After adjusting the parameters, click the "Start Drawing" button to simulate the drawing process. The program will simulate the drawing process based on the results of edge detection, using mouse movements.
+
+
+Explanation of setting.json:
 
 * `DEFAULT_SCALINE_FACTOR` (Default Simplification Factor): This value represents the degree of simplification of images, expressed as a percentage.
 * `MIN_EDGE_LENGTH` (Minimum Edge Length): This value represents the minimum length of edges to be retained during simplification.
@@ -58,13 +48,15 @@ Version Updates
     1. Removed pixel intensity-based drawing mode.
     2. Simplified drawing time using the [Douglas-Peucker algorithm](https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm).
     3. Added setting.json configuration file for adjusting program parameters as needed.
+* v1.2.0 (2024-01-18):
+    1. Changed tkinter to PyQt.
+    2. Added temporary data storage functionality.
+    3. Used linear transformation to scale images.
 
 To-Do List
 ---
 Here are some upcoming features and improvements:
 
-- [ ] Enhance drawing algorithm for faster execution
-- [ ] Add export contours and import functionality
-- [ ] Add embedding preview functionality
+- [x] Add embedding preview functionality
 
 If you have any suggestions or questions, please feel free to contact the author.
