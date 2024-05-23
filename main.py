@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QFileDialog
 from PyQt5.QtGui import QPixmap, QImage, QIcon
 from PIL import Image, ImageGrab
 import cv2 as cv
-import numpy as np
+import math
 
 from DataManager import DataManager
 from DrawSubsystem import DrawSubsystem
@@ -57,14 +57,12 @@ class MyApp(QMainWindow, Ui_MainWindow):
         self.openfile_btn.clicked.connect(self.openFile)
         self.setcoord_btn.clicked.connect(self.setCoord)
         self.start_btn.clicked.connect(self.startDrawing)
-        self.resizeEdges_btn.clicked.connect(self.resizeEdges)
         self.reload_btn.clicked.connect(self.reloadImage)
 
         self.edges_select.itemClicked.connect(self.edgeSelected)
 
         self.reload_btn.setEnabled(False)
         self.start_btn.setEnabled(False)
-        self.resizeEdges_btn.setEnabled(False)
 
     def toggleBtn(self, state):
         self.start_btn.setEnabled(state)
@@ -73,7 +71,6 @@ class MyApp(QMainWindow, Ui_MainWindow):
         self.setcoord_btn.setEnabled(state)
         self.openfile_btn.setEnabled(state)
         self.reload_btn.setEnabled(state)
-        self.resizeEdges_btn.setEnabled(state)
 
     def applySetting(self):
         self.data_manager.saveSetting({
@@ -142,19 +139,22 @@ class MyApp(QMainWindow, Ui_MainWindow):
         draw_image_edges = self.saved_image_edges[self.edges_select.row(selected_item)] if selected_item else self.current_image_edges
 
         self.loadImage(draw_image_edges.path)
+        self.statusbar.showMessage(f"正在加載 {draw_image_edges.name} ", 2000)
 
     def loadImage(self, path):
         self.start_time = time.time()
         self.toggleBtn(False)
 
         if self.data_manager.jsetting["USE_SPEEDMODE"]:
-            self.statusbar.showMessage(f"加載圖片中... (快速模式)")
+            self.statusbar.showMessage(f"加載圖片中... (快速模式, 不顯示進度條)")
             self.progressing_data.setText("圖片處理: ")
 
         imageLoader = ImageLoader(
             path=path, 
             setting=self.getsetting(), 
-            parent=self
+            parent=self,
+            name=self.edgeName.text(),
+            linar_transform_matrix=self.getLinarTransfromMatrix()
         )
 
         imageLoader.progress_signal.progress.connect(self.imageLoaderCallback)
@@ -174,7 +174,8 @@ class MyApp(QMainWindow, Ui_MainWindow):
 
         self.current_image_edges = result
         self.saved_image_edges.append(result)
-        self.edges_select.addItem(result.timestemp)
+        
+        self.edges_select.addItem(f"{result.name}")
         self.edges_select.setCurrentRow(self.edges_select.count() - 1)
 
         self.setDisplayImage(result.path)
@@ -224,11 +225,21 @@ class MyApp(QMainWindow, Ui_MainWindow):
         self.statusbar.showMessage(f'{["完成!", "游標移動!"][feedback]}', 2000)
         self.progressing_data.setText("")
 
-    def resizeEdges(self):
-        scale_value = self.RESIZE_SCALE.value() / 100
-        for i, edge in enumerate(self.current_image_edges.edges):
-            self.current_image_edges.edges[i] = np.array(edge) * np.array([scale_value, scale_value])
+    def getLinarTransfromMatrix(self):
+        matrix = [
+            [self.LTM_11.text(), self.LTM_12.text()],
+            [self.LTM_21.text(), self.LTM_22.text()]
+        ]
 
+        if any("" in row for row in matrix):
+            return None
+        
+        matrix = [
+            [eval(matrix[0][0]), eval(matrix[0][1])],
+            [eval(matrix[1][0]), eval(matrix[1][1])]
+        ]
+        
+        return matrix
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

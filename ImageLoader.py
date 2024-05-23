@@ -28,23 +28,26 @@ def simplify_edge(args):
         return None
 
 class ImageEdges:
-    def __init__(self, path, edges, scale):
+    def __init__(self, path, edges, scale, name=None):
         self.path = path
         self.edges = edges
         self.scale = scale
         self.total_coords = sum([len(edge) for edge in self.edges])
-        self.timestemp = datetime.datetime.now().strftime("%H:%M:%S")
+        self.timestemp = datetime.datetime.now().strftime("%H%M%S")
+        self.name = f"{name}-{self.timestemp}" if name else f"newedge-{self.timestemp}"
 
 class WorkerSignals(QObject):
     finished = pyqtSignal(object)
     progress = pyqtSignal(float)
 
 class ImageLoader(QThread):
-    def __init__(self, path, setting, area=None, parent=None):
+    def __init__(self, path, setting, parent=None, name=None, *args, **kwargs):
         super(ImageLoader, self).__init__(parent)
         self.progress_signal = WorkerSignals()
 
+        self.linar_transform_matrix = kwargs['linar_transform_matrix'] if 'linar_transform_matrix' in kwargs else None
         self.path = path
+        self.name = name
         self.setting = setting
 
     def run(self):
@@ -64,7 +67,11 @@ class ImageLoader(QThread):
 
         edges = self.fixEdges([np.squeeze(contour) for contour in contours])
         edges = self.simplifyEdges(edges, self.setting["SCALINE_FACTOR"], self.setting["USE_SPEEDMODE"], MAX_WORKERS)
-        self.progress_signal.finished.emit(ImageEdges(self.path, edges, scale))
+
+        if self.linar_transform_matrix is not None:
+            edges = self.linarTransform(edges)
+
+        self.progress_signal.finished.emit(ImageEdges(self.path, edges, scale, name=self.name))
 
     def caculateResizeScale(self, area, image_shape):
         if area is None:
@@ -105,5 +112,15 @@ class ImageLoader(QThread):
 
         simplified_edges.extend(filter(None, results))
         return simplified_edges
+    
+    def linarTransform(self, edges):
+        linar_transform_matrix = np.array(self.linar_transform_matrix)
+        transformed_edges = []
+        for edge in edges:
+            coords_matrix = np.array([[coord[i] for coord in edge] for i in range(2)])
+            linar_transform_coords = linar_transform_matrix.dot(coords_matrix)
+            coords = [np.array([int(linar_transform_coords[0][i]), int(linar_transform_coords[1][i])]) for i in range(len(linar_transform_coords[0]))]
+            transformed_edges.append(coords)
 
+        return transformed_edges
         
